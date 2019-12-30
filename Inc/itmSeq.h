@@ -43,9 +43,18 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "generics.h"
+
+#ifdef DEBUG
+    #include "generics.h"
+#else
+    #define genericsReport(x...)
+#endif
+
 #include "itmDecoder.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 struct ITMSeq
 
 {
@@ -65,4 +74,7 @@ struct ITMPacket *ITMSeqGetPacket( struct ITMSeq *d );
 bool ITMSeqPump( struct ITMSeq *d, uint8_t c );
 
 // ====================================================================================================
+#ifdef __cplusplus
+}
+#endif
 #endif

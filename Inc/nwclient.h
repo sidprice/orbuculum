@@ -1,6 +1,6 @@
 /*
- * Generic Routines
- * ================
+ * Network Server support
+ * ======================
  *
  * Copyright (C) 2017, 2019  Dave Marples  <dave@marples.net>
  * All rights reserved.
@@ -31,33 +31,42 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _GENERICS_
-#define _GENERICS_
-#include <stdbool.h>
-#include <limits.h>
-#include <stdint.h>
+#ifndef _NW_CLIENT_
+#define _NW_CLIENT_
 
-#if defined LINUX
-    #define EOL "\n"
-#else
-    #define EOL "\n\r"
-#endif
+#include "generics.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include <semaphore.h>
+
 // ====================================================================================================
-enum verbLevel {V_ERROR, V_WARN, V_INFO, V_DEBUG};
 
+#define NWCLIENT_SERVER_PORT (3443)           /* Server port definition */
+#define TRANSFER_SIZE (4096)
 
-char *GenericsEscape( char *str );
-char *GenericsUnescape( char *str );
+struct nwclientsHandle
 
-void genericsSetReportLevel( enum verbLevel lset );
-void genericsReport( enum verbLevel l, const char *fmt, ... );
-void genericsExit( int status, const char *fmt, ... );
+{
+    struct nwClient *firstClient;             /* Head of linked list of network clients */
+    sem_t clientList;                         /* Locking semaphore for list of network clients */
+
+    int sockfd;                               /* The socket for the inferior */
+    pthread_t ipThread;                       /* The listening thread for n/w clients */
+};
+
+// ====================================================================================================
+
+void nwclientSend( struct nwclientsHandle *h, uint32_t len, uint8_t *buffer );
+
+void nwclientShutdown( struct nwclientsHandle *h );
+bool nwclientShutdownComplete( struct nwclientsHandle *h );
+struct nwclientsHandle *nwclientStart( int port );
+
 // ====================================================================================================
 #ifdef __cplusplus
 }
 #endif
-
 #endif

@@ -1,11 +1,17 @@
-#VERBOSE=1
-DEBUG=1
+# Optional components of the build
+WITH_NWCLIENT?=1
+WITH_FIFOS?=1
 WITH_FPGA?=1
 
-CFLAGS=-DVERSION="\"1.00\""
+# Build configuration
+#VERBOSE=1
+#DEBUG=1
+
+CFLAGS=-DVERSION="\"1.10 InProgress\""
 
 CROSS_COMPILE=
 # Output Files
+ORBLIB = orb
 ORBUCULUM = orbuculum
 ORBCAT = orbcat
 ORBTOP = orbtop
@@ -34,11 +40,19 @@ endif
 ifdef DEBUG
 GCC_DEFINE= -DDEBUG
 DEBUG_OPTS = -g3 -gdwarf-2 -ggdb3
-OPT_LEVEL = 
+OPT_LEVEL = -Og
 else
 GCC_DEFINE=
 DEBUG_OPTS =
 OPT_LEVEL = -O2
+endif
+
+ifeq ($(WITH_FIFOS),1)
+CFLAGS += -DWITH_FIFOS
+endif
+
+ifeq ($(WITH_NWCLIENT),1)
+CFLAGS += -DWITH_NWCLIENT
 endif
 
 # Directories for sources
@@ -54,11 +68,11 @@ CFILES =
 SFILES =
 OLOC = ofiles
 INCLUDE_PATHS += -I/usr/local/include/libusb-1.0 -I/usr/include/libiberty
-LDLIBS = -L/usr/local/lib -lusb-1.0 -lelf -lbfd -lz -ldl -liberty
+LDLIBS = -L. -L/usr/local/lib -lusb-1.0 -lelf -lbfd -lz -ldl -liberty -L$(OLOC) -l$(ORBLIB)
 
-#ifdef LINUX
+ifdef LINUX
 LDLIBS += -lpthread
-#endif
+endif
 
 ##########################################################################
 # Generic multi-project files 
@@ -71,9 +85,16 @@ LDLIBS += -lpthread
 # Main Files
 # ==========
 
+ORBLIB_CFILES = $(App_DIR)/itmDecoder.c $(App_DIR)/tpiuDecoder.c $(App_DIR)/itmSeq.c
 ORBUCULUM_CFILES = $(App_DIR)/$(ORBUCULUM).c $(App_DIR)/filewriter.c $(FPGA_CFILES)
+ifeq ($(WITH_FIFOS),1)
+ORBUCULUM_CFILES += $(App_DIR)/fifos.c
+endif
+ifeq ($(WITH_NWCLIENT),1)
+ORBUCULUM_CFILES += $(App_DIR)/nwclient.c
+endif
 ORBCAT_CFILES = $(App_DIR)/$(ORBCAT).c 
-ORBTOP_CFILES = $(App_DIR)/$(ORBTOP).c $(App_DIR)/itmSeq.c $(App_DIR)/symbols.c $(EXT)/cJSON.c
+ORBTOP_CFILES = $(App_DIR)/$(ORBTOP).c $(App_DIR)/symbols.c $(EXT)/cJSON.c
 ORBDUMP_CFILES = $(App_DIR)/$(ORBDUMP).c
 ORBSTAT_CFILES = $(App_DIR)/$(ORBSTAT).c $(App_DIR)/symbols.c
 
@@ -94,6 +115,7 @@ ASTYLE = astyle
 AS = $(CROSS_COMPILE)gcc
 CC = $(CROSS_COMPILE)gcc
 LD = $(CROSS_COMPILE)gcc
+AR = $(CROSS_COMPILE)ar
 GDB = $(CROSS_COMPILE)gdb
 OBJCOPY = $(CROSS_COMPILE)objcopy
 OBJDUMP = $(CROSS_COMPILE)objdump
@@ -134,6 +156,10 @@ POBJS = $(patsubst %,$(OLOC)/%,$(OBJS))
 PDEPS = $(POBJS:.o=.d)
 
 # Per Target Stuff
+ORBLIB_OBJS =  $(OBJS) $(patsubst %.c,%.o,$(ORBLIB_CFILES))
+ORBLIB_POBJS = $(POJBS) $(patsubst %,$(OLOC)/%,$(ORBLIB_OBJS))
+ORBLIB_PDEPS = $(PDEPS) $(ORBLIB_POBJS:.o=.d)
+
 ORBUCULUM_OBJS =  $(OBJS) $(patsubst %.c,%.o,$(ORBUCULUM_CFILES))
 ORBUCULUM_POBJS = $(POJBS) $(patsubst %,$(OLOC)/%,$(ORBUCULUM_OBJS))
 ORBUCULUM_PDEPS = $(PDEPS) $(ORBUCULUM_POBJS:.o=.d)
@@ -154,7 +180,7 @@ ORBSTAT_OBJS =  $(OBJS) $(patsubst %.c,%.o,$(ORBSTAT_CFILES))
 ORBSTAT_POBJS = $(POJBS) $(patsubst %,$(OLOC)/%,$(ORBSTAT_OBJS))
 ORBSTAT_PDEPS = $(PDEPS) $(ORBSTAT_POBJS:.o=.d)
 
-CFILES += $(App_DIR)/itmDecoder.c $(App_DIR)/tpiuDecoder.c $(App_DIR)/generics.c
+CFILES += $(App_DIR)/generics.c
 
 ##########################################################################
 ##########################################################################
@@ -173,23 +199,27 @@ $(OLOC)/%.o : %.c
 
 build: $(ORBUCULUM) $(ORBCAT) $(ORBTOP) $(ORBDUMP) $(ORBSTAT)
 
-$(ORBUCULUM) : get_version $(ORBUCULUM_POBJS) $(SYS_OBJS)
+$(ORBLIB) : get_version $(ORBLIB_POBJS)
+	$(Q)$(AR) rcs $(OLOC)/lib$(ORBLIB).a  $(ORBLIB_POBJS)
+	-@echo "Completed build of" $(ORBLIB)
+
+$(ORBUCULUM) : $(ORBLIB) $(ORBUCULUM_POBJS) 
 	$(Q)$(LD) $(LDFLAGS) -o $(OLOC)/$(ORBUCULUM) $(MAP) $(ORBUCULUM_POBJS) $(LDLIBS)
 	-@echo "Completed build of" $(ORBUCULUM)
 
-$(ORBCAT) : get_version $(ORBCAT_POBJS) $(SYS_OBJS)
+$(ORBCAT) : $(ORBLIB) $(ORBCAT_POBJS)
 	$(Q)$(LD) $(LDFLAGS) -o $(OLOC)/$(ORBCAT) $(MAP) $(ORBCAT_POBJS) $(LDLIBS)
 	-@echo "Completed build of" $(ORBCAT)
 
-$(ORBTOP) : get_version $(ORBTOP_POBJS) $(SYS_OBJS)
+$(ORBTOP) : $(ORBLIB) $(ORBTOP_POBJS)
 	$(Q)$(LD) $(LDFLAGS) -o $(OLOC)/$(ORBTOP) $(MAP) $(ORBTOP_POBJS) $(LDLIBS)
 	-@echo "Completed build of" $(ORBTOP)
 
-$(ORBDUMP) : get_version $(ORBDUMP_POBJS) $(SYS_OBJS)
+$(ORBDUMP) : $(ORBLIB) $(ORBDUMP_POBJS)
 	$(Q)$(LD) $(LDFLAGS) -o $(OLOC)/$(ORBDUMP) $(MAP) $(ORBDUMP_POBJS) $(LDLIBS)
 	-@echo "Completed build of" $(ORBDUMP)
 
-$(ORBSTAT) : get_version $(ORBSTAT_POBJS) $(SYS_OBJS)
+$(ORBSTAT) : $(ORBLIB) $(ORBSTAT_POBJS)
 	$(Q)$(LD) $(LDFLAGS) -o $(OLOC)/$(ORBSTAT) $(MAP) $(ORBSTAT_POBJS) $(LDLIBS)
 	-@echo "Completed build of" $(ORBSTAT)
 

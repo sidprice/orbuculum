@@ -34,7 +34,12 @@
 #ifndef _TPIU_DECODER_
 #define _TPIU_DECODER_
 
-#include "generics.h"
+#include <stdint.h>
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 enum TPIUPumpEvent
 {
@@ -97,4 +102,7 @@ enum TPIUPumpEvent TPIUPump( struct TPIUDecoder *t, uint8_t d );
 
 void TPIUDecoderInit( struct TPIUDecoder *t );
 // ====================================================================================================
+#ifdef __cplusplus
+}
+#endif
 #endif
